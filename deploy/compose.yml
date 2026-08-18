@@ -1,0 +1,72 @@
+# Self-hosted deployment: one app instance and its PostgreSQL. The app speaks
+# plain HTTP on port 3000 inside the compose network and publishes nothing to
+# the host: a reverse proxy (Traefik, nginx, …) joins the network and gives it
+# a hostname and TLS, added as a second compose file rather than by editing
+# this one. See the README for that file, and for the four-line variant that
+# publishes a local port instead when there is no proxy yet.
+#
+#   cp deploy/.env.example deploy/.env   # set POSTGRES_PASSWORD
+#   docker compose -f deploy/compose.yml up -d --build
+#
+# The PostgreSQL major has to match the one the test suite runs on — PGlite
+# 0.5.x is PostgreSQL 18 — or the suite verifies an engine production never
+# runs. Changing it later is a `pg_dump`/`pg_restore` across majors, not an
+# image bump.
+#
+# Everything else — the Discord application, the allowed server, the bot token
+# and the app URL — is configured in the app itself at /setup.
+
+name: tasks
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tasks}
+      POSTGRES_USER: ${POSTGRES_USER:-tasks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      # 18+ keeps its data in a major-version subdirectory and refuses to start
+      # with a mount at /var/lib/postgresql/data, which is where 17 and earlier
+      # put it. Mounting the parent is what these images now expect, and what
+      # lets a later `pg_upgrade --link` stay inside one mount point.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasks} -d ${POSTGRES_DB:-tasks}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app:
+    # `up -d --build` replaces whatever `image:` names, so without a tag every
+    # build overwrites the running one and the version it replaced becomes a
+    # dangling layer nothing can name. Tagging each build keeps the previous
+    # one referenceable: set TASKS_IMAGE_TAG and `up -d` rolls back to it
+    # without rebuilding. See the README.
+    image: tasks-app:${TASKS_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tasks}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tasks}
+      # Set to false to apply migrations from the pipeline instead:
+      #   docker compose -f deploy/compose.yml run --rm app bun run db:migrate
+      DATABASE_MIGRATE_ON_START: ${DATABASE_MIGRATE_ON_START:-true}
+      # Which forwarded hops belong to the proxy rather than to a client. The
+      # default covers Docker's address pool; see lib/auth/trusted-proxies.ts.
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
+      PORT: "3000"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "process.exit((await fetch('http://127.0.0.1:3000/api/health')).ok ? 0 : 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres-data:

@@ -1,0 +1,29 @@
+# Copy to deploy/compose.override.yml (git-ignored) and set the host.
+#
+#   docker compose -f deploy/compose.yml -f deploy/compose.override.yml up -d --build
+#
+# Pairs with the traefik-compose stack, which owns the `proxy` network,
+# terminates TLS and redirects :80 to :443 — so the only labels needed here
+# are the router rule and the port behind it.
+#
+# `default` must stay in the list: naming networks in an override replaces the
+# service's list rather than adding to it, and dropping `default` would cut
+# the app off from postgres.
+
+services:
+  app:
+    networks: [default, proxy]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tasks.rule=Host(`tasks.example.com`)"
+      - "traefik.http.services.tasks.loadbalancer.server.port=3000"
+      # Without this Traefik forwards to the container for as long as it is
+      # running, however it answers. With it, an instance that cannot reach its
+      # database is taken out of the pool instead of serving 500s to everyone.
+      - "traefik.http.services.tasks.loadbalancer.healthcheck.path=/api/health"
+      - "traefik.http.services.tasks.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.tasks.loadbalancer.healthcheck.timeout=5s"
+
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Every color goes through `light-dark()`, so the palette
+ * follows `color-scheme`: the OS preference by default, or the `light` /
+ * `dark` class on <html> when a theme is chosen. No script is needed to avoid
+ * a flash because the browser resolves the scheme before first paint.
+ */
+:root {
+  color-scheme: light dark;
+
+  --background: light-dark(#ffffff, #0f1012);
+  --background-secondary: light-dark(#f9f9fa, #141518);
+  --background-tertiary: light-dark(#f1f2f4, #1a1b1f);
+  --background-quaternary: light-dark(#e8e9ec, #202126);
+  --sidebar: light-dark(#f7f8f9, #0b0c0e);
+  --surface: light-dark(#ffffff, #17181c);
+  --surface-raised: light-dark(#ffffff, #1c1d22);
+  --overlay: light-dark(rgba(20, 21, 26, 0.35), rgba(0, 0, 0, 0.55));
+  --foreground: light-dark(#1f2126, #f4f5f7);
+  --foreground-secondary: light-dark(#3d414a, #d0d4dc);
+  --foreground-tertiary: light-dark(#6f7480, #8b909b);
+  --foreground-quaternary: light-dark(#9a9ea8, #5f636c);
+  --border: light-dark(#e4e5e9, #26272d);
+  --border-strong: light-dark(#d4d6dc, #33353c);
+  --border-subtle: light-dark(#eeeff2, #1e1f24);
+  --accent: light-dark(#5e6ad2, #6c78e6);
+  --accent-hover: light-dark(#6b76e0, #7b86ee);
+  --accent-foreground: #ffffff;
+  --accent-muted: light-dark(rgba(94, 106, 210, 0.12), rgba(108, 120, 230, 0.18));
+  --success: light-dark(#27ae60, #4cc38a);
+  --warning: #f2994a;
+  --danger: light-dark(#eb5757, #ef6b6b);
+  --info: light-dark(#26b5ce, #3ec1d9);
+  --selection: light-dark(rgba(94, 106, 210, 0.16), rgba(108, 120, 230, 0.22));
+  --focus-ring: light-dark(rgba(94, 106, 210, 0.55), rgba(108, 120, 230, 0.6));
+
+  --shadow-popover:
+    0 0 0 1px light-dark(rgba(20, 21, 26, 0.06), rgba(255, 255, 255, 0.06)),
+    0 8px 24px light-dark(rgba(20, 21, 26, 0.12), rgba(0, 0, 0, 0.55));
+  --shadow-dialog:
+    0 0 0 1px light-dark(rgba(20, 21, 26, 0.06), rgba(255, 255, 255, 0.06)),
+    0 24px 64px light-dark(rgba(20, 21, 26, 0.24), rgba(0, 0, 0, 0.7));
+}
+
+.light {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
+  --color-background-quaternary: var(--background-quaternary);
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-overlay: var(--overlay);
+
+  --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-tertiary: var(--foreground-tertiary);
+  --color-foreground-quaternary: var(--foreground-quaternary);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-muted: var(--accent-muted);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-selection: var(--selection);
+
+  --shadow-popover: var(--shadow-popover);
+  --shadow-dialog: var(--shadow-dialog);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  --animate-fade-in: fade-in 120ms ease-out;
+  --animate-scale-in: scale-in 120ms ease-out;
+  --animate-slide-up: slide-up 160ms ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans text-sm;
+    font-feature-settings:
+      "cv01", "cv02", "cv03", "cv04", "ss01", "ss03", "tnum";
+  }
+
+  ::selection {
+    background: var(--selection);
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+    border-radius: 4px;
+  }
+
+  button,
+  [role="button"] {
+    cursor: default;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Rendered markdown for issue descriptions and comments. */
+.prose-issue {
+  @apply text-[13.5px] leading-6 text-foreground-secondary;
+}
+.prose-issue > * + * {
+  @apply mt-3;
+}
+.prose-issue h1,
+.prose-issue h2,
+.prose-issue h3 {
+  @apply text-foreground font-semibold;
+}
+.prose-issue h1 {
+  @apply text-lg;
+}
+.prose-issue h2 {
+  @apply text-base;
+}
+.prose-issue h3 {
+  @apply text-sm;
+}
+.prose-issue ul {
+  @apply list-disc pl-5;
+}
+.prose-issue ol {
+  @apply list-decimal pl-5;
+}
+.prose-issue li + li {
+  @apply mt-1;
+}
+.prose-issue code {
+  @apply rounded bg-background-tertiary px-1 py-0.5 font-mono text-[12px] text-foreground;
+}
+.prose-issue pre {
+  @apply overflow-x-auto rounded-md border border-border bg-background-secondary p-3;
+}
+.prose-issue pre code {
+  @apply bg-transparent p-0;
+}
+.prose-issue a {
+  @apply text-accent underline-offset-2 hover:underline;
+}
+.prose-issue blockquote {
+  @apply border-l-2 border-border-strong pl-3 text-foreground-tertiary;
+}
+.prose-issue input[type="checkbox"] {
+  @apply mr-1.5 align-middle;
+}
