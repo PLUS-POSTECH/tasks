@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icon";
 import { bulkUpdateIssues } from "@/lib/issues/actions";
 
-import { AssigneePicker } from "./pickers/assignee-picker";
+import { IssueAssigneePicker } from "./pickers/assignee-picker";
 import { PriorityPicker } from "./pickers/priority-picker";
 import { ProjectPicker } from "./pickers/project-picker";
 import { StatePicker } from "./pickers/state-picker";
@@ -53,10 +53,10 @@ export const BulkActionBar = ({
         variant="chip"
         onSelect={(priority) => apply({ priority })}
       />
-      <AssigneePicker
-        value={null}
+      <IssueAssigneePicker
+        value={[]}
         variant="chip"
-        onSelect={(assigneeIdentifier) => apply({ assigneeIdentifier })}
+        onChange={(assigneeIdentifiers) => apply({ assigneeIdentifiers: [...assigneeIdentifiers] })}
       />
       <ProjectPicker
         value={null}

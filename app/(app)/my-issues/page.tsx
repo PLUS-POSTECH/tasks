@@ -71,7 +71,7 @@ export default async function MyIssuesPage(props: PageProps<"/my-issues">) {
         groupingChoices={["state", "priority", "project", "label", "none"]}
         emptyTitle={tab === "assigned" ? "No issues assigned to you" : tab === "created" ? "You haven't created any issues" : "You aren't subscribed to any issues"}
         emptyDescription="Issues will appear here as they are assigned, created, or followed."
-        createDefaults={{ assigneeIdentifier: currentUser.identifier }}
+        createDefaults={{ assigneeIdentifiers: [currentUser.identifier] }}
       />
     </>
   );

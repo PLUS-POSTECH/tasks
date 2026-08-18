@@ -11,7 +11,11 @@ import {
   settledFilterCategories,
   everyIssueScope,
 } from "@/lib/issues/filters";
-import { groupIssues } from "@/lib/issues/grouping";
+import {
+  assigneeIdentifiersAfterGroupDrop,
+  groupCreateDefaults,
+  groupIssues,
+} from "@/lib/issues/grouping";
 import { placementForDrop } from "@/lib/issues/placement";
 import {
   emptyIssueSelection,
@@ -162,6 +166,55 @@ describe("grouping", () => {
       "shared",
       "shared",
     ]);
+  });
+
+  test("moves only the source assignee when a shared card changes columns", () => {
+    const alex = {
+      identifier: "alex",
+      name: "Alex",
+      displayName: "alex",
+      avatarColor: "#000",
+      image: null,
+    };
+    const blair = { ...alex, identifier: "blair", name: "Blair", displayName: "blair" };
+    const casey = { ...alex, identifier: "casey", name: "Casey", displayName: "casey" };
+    const shared = makeIssue({ identifier: "shared", assignees: [alex, blair], assignee: alex });
+    const caseys = makeIssue({ identifier: "caseys", assignees: [casey], assignee: casey });
+    const unassigned = makeIssue({ identifier: "unassigned" });
+    const groups = groupIssues([shared, caseys, unassigned], "assignee", "priority", {
+      states: [],
+      showEmptyGroups: false,
+    });
+    const source = groups.find((group) => group.key === alex.identifier);
+    const target = groups.find((group) => group.key === casey.identifier);
+    const empty = groups.find((group) => group.key === "unassigned");
+    expect(target).toBeDefined();
+    expect(empty).toBeDefined();
+    expect(assigneeIdentifiersAfterGroupDrop(target!, source, shared.identifier)).toEqual([
+      blair.identifier,
+      casey.identifier,
+    ]);
+    expect(assigneeIdentifiersAfterGroupDrop(empty!, source, shared.identifier)).toEqual([]);
+  });
+
+  test("prefills the assignee set when creating inside an assignee group", () => {
+    const alex = {
+      identifier: "alex",
+      name: "Alex",
+      displayName: "alex",
+      avatarColor: "#000",
+      image: null,
+    };
+    const [group] = groupIssues(
+      [makeIssue({ assignees: [alex], assignee: alex })],
+      "assignee",
+      "priority",
+      { states: [], showEmptyGroups: false },
+    );
+    expect(group).toBeDefined();
+    expect(groupCreateDefaults(group!, {}, { prefillLabel: false })).toMatchObject({
+      assigneeIdentifiers: [alex.identifier],
+    });
   });
 });
 

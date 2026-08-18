@@ -833,6 +833,7 @@ export const toggleIssueSubscription = action(async (_actor, issueIdentifier: st
 const bulkPatchSchema = z.object({
   stateIdentifier: identifierSchema.optional(),
   priority: prioritySchema.optional(),
+  assigneeIdentifiers: z.array(identifierSchema).optional(),
   assigneeIdentifier: nullableIdentifierSchema.optional(),
   projectIdentifier: nullableIdentifierSchema.optional(),
 });
@@ -897,7 +898,9 @@ export const bulkUpdateIssues = action(async (
     if (patch.priority !== undefined) {
       await setIssuePriority(issueIdentifier, patch.priority);
     }
-    if (patch.assigneeIdentifier !== undefined) {
+    if (patch.assigneeIdentifiers !== undefined) {
+      await setIssueAssignees(issueIdentifier, patch.assigneeIdentifiers);
+    } else if (patch.assigneeIdentifier !== undefined) {
       await setIssueAssignee(issueIdentifier, patch.assigneeIdentifier);
     }
     if (patch.projectIdentifier !== undefined) {

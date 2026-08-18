@@ -4,6 +4,7 @@ import { seedDevelopmentDatabase } from "@/lib/database/development";
 import {
   addComment,
   addIssueRelation,
+  bulkUpdateIssues,
   createIssue,
   deleteComment,
   deleteIssue,
@@ -141,6 +142,27 @@ describe("issue lifecycle", () => {
     expect(updated?.subscribers.map((subscriber) => subscriber.identifier)).toEqual(
       expect.arrayContaining([currentUser.identifier, other.identifier]),
     );
+  });
+
+  signedInTest("replaces the assignee set across a bulk selection", async () => {
+    const currentUser = await getCurrentUser();
+    const other = (await listMembers()).find((member) => member.identifier !== currentUser.identifier);
+    if (!other) {
+      throw new Error("fixtures missing");
+    }
+    const first = await createIssue({ title: "Bulk pair one" });
+    const second = await createIssue({ title: "Bulk pair two" });
+
+    const result = await bulkUpdateIssues([first.identifier, second.identifier], {
+      assigneeIdentifiers: [currentUser.identifier, other.identifier],
+    });
+    expect(result.ok).toBe(true);
+    for (const issue of [first, second]) {
+      const detail = await getIssueDetail(issue.reference, currentUser.identifier);
+      expect(detail?.issue.assignees.map((assignee) => assignee.identifier).sort()).toEqual(
+        [currentUser.identifier, other.identifier].sort(),
+      );
+    }
   });
 
   signedInTest("filters by assignee token, priority, and search", async () => {

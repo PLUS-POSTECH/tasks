@@ -278,6 +278,28 @@ export const groupIssues = (
   }
 };
 
+/** Moves only the assignee represented by the source column and preserves the others. */
+export const assigneeIdentifiersAfterGroupDrop = (
+  target: IssueGroup,
+  source: IssueGroup | undefined,
+  issueIdentifier: string,
+): readonly string[] => {
+  if (target.header.kind !== "assignee" || target.header.assignee === null) {
+    return [];
+  }
+  const targetAssigneeIdentifier = target.header.assignee.identifier;
+  const sourceAssigneeIdentifier =
+    source?.header.kind === "assignee" ? (source.header.assignee?.identifier ?? null) : null;
+  const dragged = source?.issues.find((issue) => issue.identifier === issueIdentifier);
+  const kept = (dragged?.assignees ?? [])
+    .map((assignee) => assignee.identifier)
+    .filter(
+      (identifier) =>
+        identifier !== sourceAssigneeIdentifier && identifier !== targetAssigneeIdentifier,
+    );
+  return [...kept, targetAssigneeIdentifier];
+};
+
 type GroupCreateDefaultsOptions = {
   /** The list pre-fills a label group's label; the board deliberately does not. */
   readonly prefillLabel: boolean;
@@ -292,7 +314,10 @@ export const groupCreateDefaults = (
     case "state":
       return { ...base, stateIdentifier: group.header.state.identifier };
     case "assignee":
-      return { ...base, assigneeIdentifier: group.header.assignee?.identifier ?? null };
+      return {
+        ...base,
+        assigneeIdentifiers: group.header.assignee ? [group.header.assignee.identifier] : [],
+      };
     case "priority":
       return { ...base, priority: group.header.priority };
     case "project":

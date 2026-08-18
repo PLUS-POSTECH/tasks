@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { AssigneePicker } from "@/components/issues/pickers/assignee-picker";
+import { IssueAssigneePicker } from "@/components/issues/pickers/assignee-picker";
 import { DueDatePicker } from "@/components/issues/pickers/due-date-picker";
 import { EstimatePicker } from "@/components/issues/pickers/estimate-picker";
 import { LabelPicker } from "@/components/issues/pickers/label-picker";
@@ -40,7 +40,7 @@ type DraftIssue = {
   readonly description: string;
   readonly stateIdentifier: string | null;
   readonly priority: Priority;
-  readonly assigneeIdentifier: string | null;
+  readonly assigneeIdentifiers: readonly string[];
   readonly labelIdentifiers: readonly string[];
   readonly projectIdentifier: string | null;
   readonly estimate: number | null;
@@ -62,7 +62,7 @@ export const CreateIssueDialog = ({ open, defaults, onClose }: CreateIssueDialog
     description: "",
     stateIdentifier: defaults.stateIdentifier ?? null,
     priority: defaults.priority ?? 0,
-    assigneeIdentifier: defaults.assigneeIdentifier ?? null,
+    assigneeIdentifiers: defaults.assigneeIdentifiers ?? [],
     labelIdentifiers: defaults.labelIdentifiers ?? [],
     projectIdentifier: defaults.projectIdentifier ?? null,
     estimate: null,
@@ -75,7 +75,9 @@ export const CreateIssueDialog = ({ open, defaults, onClose }: CreateIssueDialog
     states.find((state) => state.type === "backlog" || state.type === "unstarted") ??
     states[0] ??
     null;
-  const selectedAssignee = members.find((member) => member.identifier === draft.assigneeIdentifier) ?? null;
+  const selectedAssignees = members.filter((member) =>
+    draft.assigneeIdentifiers.includes(member.identifier),
+  );
   const selectedLabels = labels.filter((label) => draft.labelIdentifiers.includes(label.identifier));
   const selectedProject = projects.find((project) => project.identifier === draft.projectIdentifier) ?? null;
 
@@ -100,7 +102,7 @@ export const CreateIssueDialog = ({ open, defaults, onClose }: CreateIssueDialog
           description: draft.description.trim().length > 0 ? draft.description : null,
           stateIdentifier: selectedState?.identifier ?? null,
           priority: draft.priority,
-          assigneeIdentifier: draft.assigneeIdentifier,
+          assigneeIdentifiers: [...draft.assigneeIdentifiers],
           labelIdentifiers: [...draft.labelIdentifiers],
           projectIdentifier: draft.projectIdentifier,
           estimate: draft.estimate,
@@ -177,10 +179,10 @@ export const CreateIssueDialog = ({ open, defaults, onClose }: CreateIssueDialog
           variant="chip"
           onSelect={(priority) => patch({ priority })}
         />
-        <AssigneePicker
-          value={selectedAssignee}
+        <IssueAssigneePicker
+          value={selectedAssignees}
           variant="chip"
-          onSelect={(assigneeIdentifier) => patch({ assigneeIdentifier })}
+          onChange={(assigneeIdentifiers) => patch({ assigneeIdentifiers })}
         />
         <LabelPicker
           value={selectedLabels}
@@ -192,10 +194,12 @@ export const CreateIssueDialog = ({ open, defaults, onClose }: CreateIssueDialog
         />
         <EstimatePicker value={draft.estimate} onSelect={(estimate) => patch({ estimate })} />
         <DueDatePicker value={draft.dueDate} onSelect={(dueDate) => patch({ dueDate })} />
-        {draft.assigneeIdentifier !== currentUser.identifier ? (
+        {!draft.assigneeIdentifiers.includes(currentUser.identifier) ? (
           <button
             type="button"
-            onClick={() => patch({ assigneeIdentifier: currentUser.identifier })}
+            onClick={() =>
+              patch({ assigneeIdentifiers: [...draft.assigneeIdentifiers, currentUser.identifier] })
+            }
             className="h-6 rounded-md px-1.5 text-xs text-foreground-tertiary hover:bg-background-tertiary hover:text-foreground"
           >
             Assign to me

@@ -6,7 +6,7 @@ import { useTransition, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { Icon } from "@/components/ui/icon";
 import {
-  setIssueAssignee,
+  setIssueAssignees,
   setIssueDueDate,
   setIssueLabels,
   setIssuePriority,
@@ -17,7 +17,7 @@ import { issuePath } from "@/lib/issues/reference";
 import type { IssueListItem } from "@/lib/issues/types";
 import { classNames } from "@/lib/utilities/class-names";
 
-import { AssigneePicker } from "./pickers/assignee-picker";
+import { IssueAssigneePicker } from "./pickers/assignee-picker";
 import { DueDatePicker } from "./pickers/due-date-picker";
 import { LabelPicker } from "./pickers/label-picker";
 import { PriorityPicker } from "./pickers/priority-picker";
@@ -219,10 +219,10 @@ export const IssueRow = ({
         className="hidden w-10 shrink-0 text-right text-xs text-foreground-quaternary tabular-nums sm:inline"
       />
 
-      <AssigneePicker
-        value={issue.assignee}
-        onSelect={(assigneeIdentifier) =>
-          startTransition(() => setIssueAssignee(issue.identifier, assigneeIdentifier))
+      <IssueAssigneePicker
+        value={issue.assignees}
+        onChange={(assigneeIdentifiers) =>
+          startTransition(() => setIssueAssignees(issue.identifier, assigneeIdentifiers))
         }
         avatarSize={18}
         {...pickerProps("assignee")}

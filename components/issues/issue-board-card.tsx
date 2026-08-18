@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useTransition, type DragEvent } from "react";
 
 import { Icon } from "@/components/ui/icon";
-import { setIssueAssignee, setIssuePriority } from "@/lib/issues/actions";
+import { setIssueAssignees, setIssuePriority } from "@/lib/issues/actions";
 import { issuePath } from "@/lib/issues/reference";
 import type { IssueListItem } from "@/lib/issues/types";
 import { classNames } from "@/lib/utilities/class-names";
 
-import { AssigneePicker } from "./pickers/assignee-picker";
+import { IssueAssigneePicker } from "./pickers/assignee-picker";
 import { PriorityPicker } from "./pickers/priority-picker";
 
 type IssueBoardCardProps = {
@@ -50,11 +50,11 @@ export const IssueBoardCard = ({
           </span>
         ) : null}
         <span className="flex-1" />
-        <AssigneePicker
-          value={issue.assignee}
+        <IssueAssigneePicker
+          value={issue.assignees}
           avatarSize={18}
-          onSelect={(assigneeIdentifier) =>
-            startTransition(() => setIssueAssignee(issue.identifier, assigneeIdentifier))
+          onChange={(assigneeIdentifiers) =>
+            startTransition(() => setIssueAssignees(issue.identifier, assigneeIdentifiers))
           }
         />
       </div>

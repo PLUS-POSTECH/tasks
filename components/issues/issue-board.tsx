@@ -6,12 +6,16 @@ import { Icon } from "@/components/ui/icon";
 import { IconButton } from "@/components/ui/icon-button";
 import {
   moveIssueOnBoard,
-  setIssueAssignee,
+  setIssueAssignees,
   setIssueLabels,
   setIssuePriority,
   setIssueProject,
 } from "@/lib/issues/actions";
-import { groupCreateDefaults, type IssueGroup } from "@/lib/issues/grouping";
+import {
+  assigneeIdentifiersAfterGroupDrop,
+  groupCreateDefaults,
+  type IssueGroup,
+} from "@/lib/issues/grouping";
 import { placementForDrop } from "@/lib/issues/placement";
 import { classNames } from "@/lib/utilities/class-names";
 
@@ -26,7 +30,7 @@ type IssueBoardProps = {
 
 const dragMimeType = "application/x-tasks-issue";
 
-/** An issue can be in several label columns at once, so a drag carries the column it left. */
+/** An issue can be in several assignee or label columns, so a drag carries the column it left. */
 type BoardDrag = {
   readonly issueIdentifier: string;
   readonly sourceGroupKey: string;
@@ -85,7 +89,10 @@ export const IssueBoard = ({
           await moveIssueOnBoard(identifier, group.header.state.identifier, placement);
           return;
         case "assignee":
-          await setIssueAssignee(identifier, group.header.assignee?.identifier ?? null);
+          await setIssueAssignees(
+            identifier,
+            assigneeIdentifiersAfterGroupDrop(group, sourceGroup, identifier),
+          );
           await moveIssueOnBoard(identifier, null, placement);
           return;
         case "priority":

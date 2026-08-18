@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTransition, type ReactNode } from "react";
 
-import { AssigneePicker } from "@/components/issues/pickers/assignee-picker";
+import { IssueAssigneePicker } from "@/components/issues/pickers/assignee-picker";
 import { DueDatePicker } from "@/components/issues/pickers/due-date-picker";
 import { EstimatePicker } from "@/components/issues/pickers/estimate-picker";
 import { IssueSearchPicker } from "@/components/issues/pickers/issue-search-picker";
@@ -23,7 +23,7 @@ import { useWorkspaceData } from "@/components/workspace/workspace-data-provider
 import {
   addIssueRelation,
   removeIssueRelation,
-  setIssueAssignee,
+  setIssueAssignees,
   setIssueDueDate,
   setIssueEstimate,
   setIssueLabels,
@@ -108,11 +108,11 @@ export const IssuePropertiesPanel = ({
           />,
         )}
         {row(
-          "Assignee",
-          <AssigneePicker
-            value={issue.assignee}
+          "Assignees",
+          <IssueAssigneePicker
+            value={issue.assignees}
             variant="row"
-            onSelect={(assigneeIdentifier) => startTransition(() => setIssueAssignee(issue.identifier, assigneeIdentifier))}
+            onChange={(assigneeIdentifiers) => startTransition(() => setIssueAssignees(issue.identifier, assigneeIdentifiers))}
           />,
         )}
         {row(

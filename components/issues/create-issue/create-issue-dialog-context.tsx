@@ -7,7 +7,7 @@ import type { Priority } from "@/lib/database/schema";
 export type CreateIssueDefaults = {
   readonly stateIdentifier?: string;
   readonly priority?: Priority;
-  readonly assigneeIdentifier?: string | null;
+  readonly assigneeIdentifiers?: readonly string[];
   readonly labelIdentifiers?: readonly string[];
   readonly projectIdentifier?: string | null;
   readonly parentIdentifier?: string | null;
