@@ -118,11 +118,22 @@ const groupByState = (
 const groupByAssignee = (
   issues: readonly IssueListItem[],
 ): readonly IssueGroup[] => {
-  const buckets = groupBy(issues, (issue) => issue.assignee?.identifier ?? "");
   const assignees = new Map<string, UserSummary>();
+  const buckets = new Map<string, IssueListItem[]>();
+  const unassigned: IssueListItem[] = [];
   for (const issue of issues) {
-    if (issue.assignee) {
-      assignees.set(issue.assignee.identifier, issue.assignee);
+    if (issue.assignees.length === 0) {
+      unassigned.push(issue);
+      continue;
+    }
+    for (const assignee of issue.assignees) {
+      assignees.set(assignee.identifier, assignee);
+      const bucket = buckets.get(assignee.identifier);
+      if (bucket) {
+        bucket.push(issue);
+      } else {
+        buckets.set(assignee.identifier, [issue]);
+      }
     }
   }
   const named = [...assignees.values()]
@@ -133,8 +144,7 @@ const groupByAssignee = (
       header: { kind: "assignee" as const, assignee },
       issues: buckets.get(assignee.identifier) ?? [],
     }));
-  const unassigned = buckets.get("");
-  return unassigned
+  return unassigned.length > 0
     ? [
         ...named,
         {

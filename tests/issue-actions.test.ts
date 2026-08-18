@@ -10,6 +10,7 @@ import {
   editComment,
   removeIssueRelation,
   setIssueAssignee,
+  setIssueAssignees,
   setIssueLabels,
   setIssueMilestone,
   setIssueParent,
@@ -102,13 +103,44 @@ describe("issue lifecycle", () => {
     expect(detail?.issue.state.identifier).toBe(done.identifier);
     expect(detail?.issue.completedAt).not.toBeNull();
     expect(detail?.issue.priority).toBe(1);
-    expect(detail?.issue.assignee?.identifier).toBe(assignee.identifier);
+    expect(detail?.issue.assignees.map((entry) => entry.identifier)).toEqual([assignee.identifier]);
     expect(detail?.issue.labels.map((entry) => entry.identifier)).toEqual([label.identifier]);
     expect(detail?.comments).toHaveLength(1);
     expect(detail?.activities.map((activity) => activity.type)).toEqual(
-      expect.arrayContaining(["created", "state_changed", "priority_changed", "assignee_changed", "label_added", "commented"]),
+      expect.arrayContaining(["created", "state_changed", "priority_changed", "assignee_added", "label_added", "commented"]),
     );
     expect(detail?.subscribers.some((subscriber) => subscriber.identifier === assignee.identifier)).toBe(true);
+  });
+
+  signedInTest("creates and replaces multiple assignees", async () => {
+    const currentUser = await getCurrentUser();
+    const other = (await listMembers()).find((member) => member.identifier !== currentUser.identifier);
+    if (!other) {
+      throw new Error("fixtures missing");
+    }
+
+    const created = await createIssue({
+      title: "Pair on one issue",
+      assigneeIdentifiers: [currentUser.identifier, other.identifier],
+    });
+    const assigned = await getIssueDetail(created.reference, currentUser.identifier);
+    expect(assigned?.issue.assignees.map((entry) => entry.identifier).sort()).toEqual(
+      [currentUser.identifier, other.identifier].sort(),
+    );
+
+    await setIssueAssignees(created.identifier, [other.identifier]);
+    await setIssueAssignees(created.identifier, [currentUser.identifier, other.identifier]);
+
+    const updated = await getIssueDetail(created.reference, currentUser.identifier);
+    expect(updated?.issue.assignees.map((entry) => entry.identifier).sort()).toEqual(
+      [currentUser.identifier, other.identifier].sort(),
+    );
+    expect(updated?.activities.map((activity) => activity.type)).toEqual(
+      expect.arrayContaining(["assignee_removed", "assignee_added"]),
+    );
+    expect(updated?.subscribers.map((subscriber) => subscriber.identifier)).toEqual(
+      expect.arrayContaining([currentUser.identifier, other.identifier]),
+    );
   });
 
   signedInTest("filters by assignee token, priority, and search", async () => {
@@ -120,7 +152,9 @@ describe("issue lifecycle", () => {
         currentUser.identifier,
       ),
     );
-    expect(mine.every((issue) => issue.assignee?.identifier === currentUser.identifier)).toBe(true);
+    expect(
+      mine.every((issue) => issue.assignees.some((assignee) => assignee.identifier === currentUser.identifier)),
+    ).toBe(true);
 
     const urgent = await listIssues(
       everyIssueScope,

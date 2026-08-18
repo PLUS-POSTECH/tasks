@@ -322,10 +322,6 @@ export const issues = pgTable(
     stateIdentifier: uuid("state_identifier")
       .notNull()
       .references(() => workflowStates.identifier, { onDelete: "restrict" }),
-    assigneeIdentifier: uuid("assignee_identifier").references(
-      () => users.id,
-      { onDelete: "set null" },
-    ),
     creatorIdentifier: uuid("creator_identifier").references(
       () => users.id,
       { onDelete: "set null" },
@@ -358,9 +354,24 @@ export const issues = pgTable(
       table.number,
     ),
     index("issues_state_index").on(table.stateIdentifier),
-    index("issues_assignee_index").on(table.assigneeIdentifier),
     index("issues_project_index").on(table.projectIdentifier),
     index("issues_parent_index").on(table.parentIdentifier),
+  ],
+);
+
+export const issueAssignees = pgTable(
+  "issue_assignees",
+  {
+    issueIdentifier: uuid("issue_identifier")
+      .notNull()
+      .references(() => issues.identifier, { onDelete: "cascade" }),
+    userIdentifier: uuid("user_identifier")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.issueIdentifier, table.userIdentifier] }),
+    index("issue_assignees_user_index").on(table.userIdentifier),
   ],
 );
 

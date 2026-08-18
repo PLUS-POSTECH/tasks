@@ -129,14 +129,14 @@ describe("removing a member", () => {
     const namesOnThePage = async () => {
       const detail = await getIssueDetail(issue.reference, admin.identifier);
       const roster = await listAllMembers();
-      const assigned = detail?.activities.find((activity) => activity.type === "assignee_changed");
+      const assigned = detail?.activities.find((activity) => activity.type === "assignee_added");
       const comment = detail?.comments[0];
       return {
         actor: nameOfMember(roster, assigned?.actor?.identifier),
         insideThePayload: nameOfMember(
           roster,
-          assigned?.payload.toAssigneeIdentifier,
-          assigned?.payload.toAssigneeName,
+          assigned?.payload.assigneeIdentifier,
+          assigned?.payload.assigneeName,
         ),
         comment: comment?.status === "visible" ? comment.author?.name ?? "Former member" : null,
       };

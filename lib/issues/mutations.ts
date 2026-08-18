@@ -21,7 +21,7 @@ import { identifierSchema } from "@/lib/validation/schemas";
 import type { IssuePlacement } from "./placement";
 
 /**
- * The row a mutation works on, with the state, assignee and reporter it may
+ * The row a mutation works on, with the state, assignees and reporter it may
  * replace. Each is the "before" half of an activity pair and does not survive
  * the update, so all are read here rather than by the actions that record them.
  */
@@ -30,7 +30,7 @@ const loadOpenedIssue = (database: Database, identifier: string) =>
     where: eq(issues.identifier, identifier),
     with: {
       state: { columns: { name: true } },
-      assignee: { columns: memberNameColumns },
+      issueAssignees: { with: { user: { columns: memberNameColumns } } },
       creator: { columns: memberNameColumns },
     },
   });
@@ -85,6 +85,14 @@ type ActivityRecord = {
     readonly fromAssigneeName: string | null;
     readonly toAssigneeIdentifier: string | null;
     readonly toAssigneeName: string | null;
+  };
+  readonly assignee_added: {
+    readonly assigneeIdentifier: string;
+    readonly assigneeName: string;
+  };
+  readonly assignee_removed: {
+    readonly assigneeIdentifier: string;
+    readonly assigneeName: string;
   };
   readonly reporter_changed: {
     readonly fromReporterIdentifier: string | null;

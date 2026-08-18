@@ -43,6 +43,8 @@ export const activityTypes = [
   "state_changed",
   "priority_changed",
   "assignee_changed",
+  "assignee_added",
+  "assignee_removed",
   "reporter_changed",
   "label_added",
   "label_removed",

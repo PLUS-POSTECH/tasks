@@ -18,7 +18,7 @@ const reminderWith = {
   issue: {
     with: {
       state: { columns: { name: true, type: true } },
-      assignee: { columns: { name: true } },
+      issueAssignees: { with: { user: { columns: { name: true } } } },
       project: { columns: { name: true } },
     },
   },
@@ -53,7 +53,11 @@ const buildReminderMessage = (
         fields: [
           { name: "Due", value: dueText, inline: true },
           { name: "Status", value: issue.state.name, inline: true },
-          { name: "Assignee", value: issue.assignee?.name ?? "Unassigned", inline: true },
+          {
+            name: "Assignees",
+            value: issue.issueAssignees.map((assignment) => assignment.user.name).join(", ") || "Unassigned",
+            inline: true,
+          },
           { name: "Priority", value: priorityName(issue.priority), inline: true },
           ...(issue.project ? [{ name: "Project", value: issue.project.name, inline: true }] : []),
         ],

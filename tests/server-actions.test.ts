@@ -50,6 +50,7 @@ const expectedPolicies: Readonly<Record<string, "member" | "admin" | "anyone">> 
   sendIssueReminderNow: "member",
   setAdminRoles: "admin",
   setIssueAssignee: "member",
+  setIssueAssignees: "member",
   setIssueDueDate: "member",
   setIssueEstimate: "member",
   setIssueLabels: "member",

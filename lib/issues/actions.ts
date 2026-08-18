@@ -7,6 +7,7 @@ import { getDatabase, type Database } from "@/lib/database/client";
 import { manualOrderBefore } from "@/lib/database/manual-order";
 import {
   comments,
+  issueAssignees,
   issueLabels,
   issueRelations,
   issueRelationTypes,
@@ -65,7 +66,8 @@ const createIssueSchema = z.object({
   description: issueDescriptionSchema.nullable().default(null),
   stateIdentifier: nullableIdentifierSchema.default(null),
   priority: prioritySchema.default(0),
-  assigneeIdentifier: nullableIdentifierSchema.default(null),
+  assigneeIdentifiers: z.array(identifierSchema).optional(),
+  assigneeIdentifier: nullableIdentifierSchema.optional(),
   reporterIdentifier: identifierSchema.optional(),
   labelIdentifiers: z.array(identifierSchema).default([]),
   projectIdentifier: nullableIdentifierSchema.default(null),
@@ -120,18 +122,27 @@ const nameOfCurrentMilestone = async (
 ): Promise<string | null> =>
   milestoneIdentifier === null ? null : (await findMilestone(database, milestoneIdentifier))?.name ?? null;
 
-const nameOfAssignee = async (
+const requireActiveAssignees = async (
   database: Database,
-  assigneeIdentifier: string | null,
-): Promise<string | null> => {
-  if (assigneeIdentifier === null) {
-    return null;
+  workspaceIdentifier: string,
+  assigneeIdentifiers: readonly string[],
+): Promise<readonly { readonly id: string; readonly name: string }[]> => {
+  const uniqueIdentifiers = [...new Set(assigneeIdentifiers)];
+  if (uniqueIdentifiers.length === 0) {
+    return [];
   }
-  const assignee = await database.query.users.findFirst({
-    where: eq(users.id, assigneeIdentifier),
-    columns: memberNameColumns,
+  const assignees = await database.query.users.findMany({
+    where: and(
+      eq(users.workspaceIdentifier, workspaceIdentifier),
+      isNull(users.leftGuildAt),
+      inArray(users.id, uniqueIdentifiers),
+    ),
+    columns: { id: true, ...memberNameColumns },
   });
-  return assignee ? nameOfMemberRow(assignee) : null;
+  if (assignees.length !== uniqueIdentifiers.length) {
+    throw new NotFoundError("Assignee not found.");
+  }
+  return assignees;
 };
 
 const requireActiveReporter = async (
@@ -160,6 +171,11 @@ export const createIssue = action(async (actor, rawInput: CreateIssueInput): Pro
     await assertIssueAccessible(input.parentIdentifier);
   }
   const [database, workspace] = await Promise.all([getDatabase(), getWorkspace()]);
+  const assignees = await requireActiveAssignees(
+    database,
+    workspace.identifier,
+    input.assigneeIdentifiers ?? (input.assigneeIdentifier ? [input.assigneeIdentifier] : []),
+  );
   const reporterIdentifier = input.reporterIdentifier ?? actor.identifier;
   if (reporterIdentifier !== actor.identifier && !actor.isAdmin) {
     throw new ForbiddenError("Only admins can select another issue reporter.");
@@ -208,7 +224,6 @@ export const createIssue = action(async (actor, rawInput: CreateIssueInput): Pro
         description: input.description,
         stateIdentifier,
         priority: input.priority,
-        assigneeIdentifier: input.assigneeIdentifier,
         creatorIdentifier: reporterIdentifier,
         projectIdentifier: input.projectIdentifier,
         parentIdentifier: input.parentIdentifier,
@@ -228,9 +243,19 @@ export const createIssue = action(async (actor, rawInput: CreateIssueInput): Pro
         input.labelIdentifiers.map((labelIdentifier) => ({ issueIdentifier: issue.identifier, labelIdentifier })),
       );
     }
+    if (assignees.length > 0) {
+      await transaction.insert(issueAssignees).values(
+        assignees.map((assignee) => ({
+          issueIdentifier: issue.identifier,
+          userIdentifier: assignee.id,
+        })),
+      );
+    }
     await recordActivity(transaction, issue.identifier, actor.identifier, { type: "created" });
     await ensureSubscribed(transaction, issue.identifier, reporterIdentifier);
-    await notifyAssignee(transaction, issue.identifier, actor.identifier, input.assigneeIdentifier);
+    for (const assignee of assignees) {
+      await notifyAssignee(transaction, issue.identifier, actor.identifier, assignee.id);
+    }
     return { identifier: issue.identifier, reference: formatIssueReference(counter.issueCounter) };
   });
 
@@ -303,27 +328,76 @@ export const setIssuePriority = action(async (_actor, issueIdentifier: string, p
   revalidateEverything();
 });
 
-export const setIssueAssignee = action(async (_actor, issueIdentifier: string, assigneeIdentifier: string | null): Promise<void> => {
-  const parsedAssignee = nullableIdentifierSchema.parse(assigneeIdentifier);
+export const setIssueAssignees = action(async (
+  _actor,
+  issueIdentifier: string,
+  assigneeIdentifiers: readonly string[],
+): Promise<void> => {
+  const parsedAssignees = z.array(identifierSchema).parse(assigneeIdentifiers);
   const mutation = await openIssue(issueIdentifier);
   const { database, currentUser, issue } = mutation;
-  if (issue.assigneeIdentifier === parsedAssignee) {
+  const assignees = await requireActiveAssignees(database, issue.workspaceIdentifier, parsedAssignees);
+  const currentAssignees = new Map(
+    issue.issueAssignees.map((assignment) => [
+      assignment.userIdentifier,
+      nameOfMemberRow(assignment.user),
+    ]),
+  );
+  const nextAssignees = new Map(
+    assignees.map((assignee) => [assignee.id, nameOfMemberRow(assignee)]),
+  );
+  const added = [...nextAssignees].filter(([identifier]) => !currentAssignees.has(identifier));
+  const removed = [...currentAssignees].filter(([identifier]) => !nextAssignees.has(identifier));
+  if (added.length === 0 && removed.length === 0) {
     return;
   }
-  const nextAssigneeName = await nameOfAssignee(database, parsedAssignee);
-  await changeIssue(
-    mutation,
-    { assigneeIdentifier: parsedAssignee },
-    {
-      type: "assignee_changed",
-      fromAssigneeIdentifier: issue.assigneeIdentifier,
-      fromAssigneeName: issue.assignee ? nameOfMemberRow(issue.assignee) : null,
-      toAssigneeIdentifier: parsedAssignee,
-      toAssigneeName: nextAssigneeName,
-    },
-  );
-  await notifyAssignee(database, issue.identifier, currentUser.identifier, parsedAssignee);
+  await database.transaction(async (transaction) => {
+    if (removed.length > 0) {
+      await transaction
+        .delete(issueAssignees)
+        .where(
+          and(
+            eq(issueAssignees.issueIdentifier, issue.identifier),
+            inArray(issueAssignees.userIdentifier, removed.map(([identifier]) => identifier)),
+          ),
+        );
+    }
+    if (added.length > 0) {
+      await transaction.insert(issueAssignees).values(
+        added.map(([userIdentifier]) => ({
+          issueIdentifier: issue.identifier,
+          userIdentifier,
+        })),
+      );
+    }
+    for (const [assigneeIdentifier, assigneeName] of removed) {
+      await recordActivity(transaction, issue.identifier, currentUser.identifier, {
+        type: "assignee_removed",
+        assigneeIdentifier,
+        assigneeName,
+      });
+    }
+    for (const [assigneeIdentifier, assigneeName] of added) {
+      await recordActivity(transaction, issue.identifier, currentUser.identifier, {
+        type: "assignee_added",
+        assigneeIdentifier,
+        assigneeName,
+      });
+      await notifyAssignee(transaction, issue.identifier, currentUser.identifier, assigneeIdentifier);
+    }
+    await touchIssue(transaction, issue.identifier);
+  });
   revalidateEverything();
+});
+
+/** Singular compatibility for existing callers; replaces the complete assignee set. */
+export const setIssueAssignee = action(async (
+  _actor,
+  issueIdentifier: string,
+  assigneeIdentifier: string | null,
+): Promise<void> => {
+  const parsedAssignee = nullableIdentifierSchema.parse(assigneeIdentifier);
+  await setIssueAssignees(issueIdentifier, parsedAssignee ? [parsedAssignee] : []);
 });
 
 export const setIssueReporter = action(async (actor, issueIdentifier: string, reporterIdentifier: string): Promise<void> => {

@@ -40,6 +40,7 @@ const makeIssue = (overrides: Partial<IssueListItem>): IssueListItem => ({
   updatedAt: new Date("2026-01-01"),
   completedAt: null,
   state: { identifier: "todo", name: "Todo", type: "unstarted", color: "#000", position: 1 },
+  assignees: [],
   assignee: null,
   creator: null,
   labels: [],
@@ -139,6 +140,28 @@ describe("grouping", () => {
     const groups = groupIssues(issues, "state", "priority", { states, showEmptyGroups: true });
     expect(groups.map((group) => group.name)).toEqual(["Todo", "In Progress", "Done"]);
     expect(groups[0]?.issues.map((issue) => issue.identifier)).toEqual(["b", "a"]);
+  });
+
+  test("shows a shared issue in every assignee group", () => {
+    const alex = {
+      identifier: "alex",
+      name: "Alex",
+      displayName: "alex",
+      avatarColor: "#000",
+      image: null,
+    };
+    const blair = { ...alex, identifier: "blair", name: "Blair", displayName: "blair" };
+    const shared = makeIssue({ identifier: "shared", assignees: [alex, blair], assignee: alex });
+
+    const groups = groupIssues([shared], "assignee", "priority", {
+      states: [],
+      showEmptyGroups: false,
+    });
+    expect(groups.map((group) => group.name)).toEqual(["Alex", "Blair"]);
+    expect(groups.flatMap((group) => group.issues.map((issue) => issue.identifier))).toEqual([
+      "shared",
+      "shared",
+    ]);
   });
 });
 

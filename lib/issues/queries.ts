@@ -8,6 +8,7 @@ import {
   ilike,
   inArray,
   isNull,
+  notExists,
   or,
   sql,
   type SQL,
@@ -17,6 +18,7 @@ import { cache } from "react";
 
 import { getDatabase, type Database } from "@/lib/database/client";
 import {
+  issueAssignees,
   issueLabels,
   issueRelations,
   issueSubscriptions,
@@ -36,12 +38,12 @@ import {
 import type { IssueScope, ResolvedIssueFilter } from "./filters";
 import { formatIssueReference, parseIssueReference } from "./reference";
 import type { IssueListItem } from "./types";
-import { toOptionalUserSummary, userSummaryColumns } from "@/lib/users/summary";
+import { toOptionalUserSummary, toUserSummary, userSummaryColumns } from "@/lib/users/summary";
 import { issueStateSummaryColumns } from "@/lib/workflow/queries";
 
 export const issueListWith = {
   state: { columns: issueStateSummaryColumns },
-  assignee: { columns: userSummaryColumns },
+  issueAssignees: { with: { user: { columns: userSummaryColumns } } },
   creator: { columns: userSummaryColumns },
   project: {
     columns: {
@@ -210,38 +212,66 @@ const queryIssueRows = async (
 
 type IssueListRow = Awaited<ReturnType<typeof queryIssueRows>>[number];
 
-export const toIssueListItem = (row: IssueListRow, visibleProjects: VisibleProjects): IssueListItem => ({
-  identifier: row.identifier,
-  number: row.number,
-  reference: formatIssueReference(row.number),
-  title: row.title,
-  priority: row.priority,
-  estimate: row.estimate,
-  dueDate: row.dueDate,
-  sortOrder: row.sortOrder,
-  boardOrder: row.boardOrder,
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt,
-  completedAt: row.completedAt,
-  state: row.state,
-  assignee: toOptionalUserSummary(row.assignee),
-  creator: toOptionalUserSummary(row.creator),
-  labels: row.issueLabels.map((issueLabel) => issueLabel.label),
-  project: row.project,
-  // Access control: a parent in a project the actor cannot see is not named.
-  parent:
-    row.parent && isIssueVisible(visibleProjects, row.parent.projectIdentifier)
-      ? {
-          identifier: row.parent.identifier,
-          reference: formatIssueReference(row.parent.number),
-          title: row.parent.title,
-        }
-      : null,
-  subIssueCount: row.subIssueCount,
-  completedSubIssueCount: row.completedSubIssueCount,
-  isBlocked: row.blockedCount > 0,
-  commentCount: row.commentCount,
-});
+export const toIssueListItem = (row: IssueListRow, visibleProjects: VisibleProjects): IssueListItem => {
+  const assignees = row.issueAssignees
+    .map((assignment) => toUserSummary(assignment.user))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  return {
+    identifier: row.identifier,
+    number: row.number,
+    reference: formatIssueReference(row.number),
+    title: row.title,
+    priority: row.priority,
+    estimate: row.estimate,
+    dueDate: row.dueDate,
+    sortOrder: row.sortOrder,
+    boardOrder: row.boardOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    completedAt: row.completedAt,
+    state: row.state,
+    assignees,
+    // Singular compatibility for existing API clients; new callers use `assignees`.
+    assignee: assignees[0] ?? null,
+    creator: toOptionalUserSummary(row.creator),
+    labels: row.issueLabels.map((issueLabel) => issueLabel.label),
+    project: row.project,
+    // Access control: a parent in a project the actor cannot see is not named.
+    parent:
+      row.parent && isIssueVisible(visibleProjects, row.parent.projectIdentifier)
+        ? {
+            identifier: row.parent.identifier,
+            reference: formatIssueReference(row.parent.number),
+            title: row.parent.title,
+          }
+        : null,
+    subIssueCount: row.subIssueCount,
+    completedSubIssueCount: row.completedSubIssueCount,
+    isBlocked: row.blockedCount > 0,
+    commentCount: row.commentCount,
+  };
+};
+
+const assignedToAny = (database: Database, assigneeIdentifiers: readonly string[]): SQL =>
+  exists(
+    database
+      .select({ issueIdentifier: issueAssignees.issueIdentifier })
+      .from(issueAssignees)
+      .where(
+        and(
+          eq(issueAssignees.issueIdentifier, issues.identifier),
+          inArray(issueAssignees.userIdentifier, [...assigneeIdentifiers]),
+        ),
+      ),
+  );
+
+const hasNoAssignees = (database: Database): SQL =>
+  notExists(
+    database
+      .select({ issueIdentifier: issueAssignees.issueIdentifier })
+      .from(issueAssignees)
+      .where(eq(issueAssignees.issueIdentifier, issues.identifier)),
+  );
 
 const inStateOfType = (
   database: Database,
@@ -262,7 +292,7 @@ const issueScopeConditions = (database: Database, scope: IssueScope): SQL | unde
     conditions.push(inStateOfType(database, scope.stateTypes));
   }
   if (scope.assigneeIdentifiers.length > 0) {
-    conditions.push(inArray(issues.assigneeIdentifier, scope.assigneeIdentifiers));
+    conditions.push(assignedToAny(database, scope.assigneeIdentifiers));
   }
   if (scope.creatorIdentifiers.length > 0) {
     conditions.push(inArray(issues.creatorIdentifier, scope.creatorIdentifiers));
@@ -303,9 +333,9 @@ const issueFilterConditions = (
     conditions.push(
       or(
         filter.assigneeIdentifiers.length > 0
-          ? inArray(issues.assigneeIdentifier, filter.assigneeIdentifiers)
+          ? assignedToAny(database, filter.assigneeIdentifiers)
           : undefined,
-        filter.includeUnassigned ? isNull(issues.assigneeIdentifier) : undefined,
+        filter.includeUnassigned ? hasNoAssignees(database) : undefined,
       ),
     );
   }
@@ -427,5 +457,4 @@ export const findIssueByReference = cache(
     return row ? toIssueListItem(row, access.visibleProjects) : null;
   },
 );
-
 

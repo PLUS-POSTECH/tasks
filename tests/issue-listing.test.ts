@@ -4,7 +4,7 @@ import { inArray } from "drizzle-orm";
 import { getDatabase } from "@/lib/database/client";
 import { seedDevelopmentDatabase } from "@/lib/database/development";
 import { issues } from "@/lib/database/schema";
-import { createIssue, setIssueAssignee, setIssueProject } from "@/lib/issues/actions";
+import { createIssue, setIssueAssignee, setIssueAssignees, setIssueProject } from "@/lib/issues/actions";
 import {
   emptyIssueFilter,
   everyIssueScope,
@@ -45,6 +45,8 @@ describe("a route's scope against the member's filter", () => {
     await setIssueAssignee(mine.identifier, currentUser.identifier);
     const theirs = await createIssue({ title: "Scope theirs" });
     await setIssueAssignee(theirs.identifier, other.identifier);
+    const shared = await createIssue({ title: "Scope shared" });
+    await setIssueAssignees(shared.identifier, [currentUser.identifier, other.identifier]);
 
     const assignedToMe: IssueScope = {
       ...everyIssueScope,
@@ -56,11 +58,13 @@ describe("a route's scope against the member's filter", () => {
       { assignee: other.identifier },
       currentUser.identifier,
     );
+    expect(filteredToThem).toContain(shared.identifier);
+    expect(filteredToThem).not.toContain(mine.identifier);
     expect(filteredToThem).not.toContain(theirs.identifier);
-    expect(filteredToThem).toHaveLength(0);
 
     const filteredToMe = await listedIdentifiers(assignedToMe, { assignee: "me" }, currentUser.identifier);
     expect(filteredToMe).toContain(mine.identifier);
+    expect(filteredToMe).toContain(shared.identifier);
     expect(filteredToMe).not.toContain(theirs.identifier);
 
     // Naming several members still means "any of them" — within the filter.
@@ -70,6 +74,7 @@ describe("a route's scope against the member's filter", () => {
       currentUser.identifier,
     );
     expect(filteredToBoth).toContain(mine.identifier);
+    expect(filteredToBoth).toContain(shared.identifier);
     expect(filteredToBoth).not.toContain(theirs.identifier);
 
     const unscoped = await listedIdentifiers(
@@ -79,6 +84,7 @@ describe("a route's scope against the member's filter", () => {
     );
     expect(unscoped).toContain(mine.identifier);
     expect(unscoped).toContain(theirs.identifier);
+    expect(unscoped).toContain(shared.identifier);
   });
 
   signedInTest("keeps a project page inside its project when the filter names another", async () => {
@@ -163,7 +169,11 @@ describe("loading a list a page at a time", () => {
 
     const everything = await listIssuePage(assignedToThem, filter, theirs.length);
     expect(everything.hasMore).toBe(false);
-    expect(everything.issues.every((issue) => issue.assignee?.identifier === other.identifier)).toBe(true);
+    expect(
+      everything.issues.every((issue) =>
+        issue.assignees.some((assignee) => assignee.identifier === other.identifier),
+      ),
+    ).toBe(true);
     expect(everything.issues.map((issue) => issue.identifier)).toEqual(theirs);
   });
 });

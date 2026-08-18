@@ -18,6 +18,8 @@ export type IssueListItem = {
   readonly updatedAt: Date;
   readonly completedAt: Date | null;
   readonly state: IssueStateSummary;
+  readonly assignees: readonly UserSummary[];
+  /** @deprecated Use `assignees`; retained for operation-response compatibility. */
   readonly assignee: UserSummary | null;
   readonly creator: UserSummary | null;
   readonly labels: readonly LabelSummary[];

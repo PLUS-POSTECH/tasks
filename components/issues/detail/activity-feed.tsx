@@ -92,6 +92,10 @@ export const ActivityFeed = async ({ issueIdentifier, activities, comments, rela
         ) : (
           <>removed the assignee</>
         );
+      case "assignee_added":
+        return <>assigned to {strong(nameOfMember(members, payload.assigneeIdentifier, payload.assigneeName))}</>;
+      case "assignee_removed":
+        return <>unassigned {strong(nameOfMember(members, payload.assigneeIdentifier, payload.assigneeName))}</>;
       case "reporter_changed":
         return (
           <>

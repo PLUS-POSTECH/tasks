@@ -139,8 +139,8 @@ describe("how an activity entry names the thing it is about", () => {
     await setIssueAssignee(issue.identifier, assignee!.identifier);
 
     const assigneeInFeed = async () => {
-      const [assigned] = await entriesOfType(issue.reference, "assignee_changed");
-      return nameOfMember(await listAllMembers(), assigned?.payload.toAssigneeIdentifier, assigned?.payload.toAssigneeName);
+      const [assigned] = await entriesOfType(issue.reference, "assignee_added");
+      return nameOfMember(await listAllMembers(), assigned?.payload.assigneeIdentifier, assigned?.payload.assigneeName);
     };
 
     expect(await assigneeInFeed()).toBe("Assignee Before Renaming");

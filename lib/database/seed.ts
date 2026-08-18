@@ -13,6 +13,7 @@ import {
 import {
   comments,
   issueActivities,
+  issueAssignees,
   issueLabels,
   issueRelations,
   issueSubscriptions,
@@ -254,6 +255,7 @@ export const seedSampleData = async (
       ? projectMilestoneIdentifiers.get(projectIdentifier)
       : undefined;
     const createdAt = hoursAgo(24 * (2 + Math.floor(random() * 40)));
+    const assigneeIdentifier = maybe(0.2) ? null : pick(userIdentifiers);
 
     const [issue] = await database
       .insert(issues)
@@ -268,7 +270,6 @@ export const seedSampleData = async (
           : null,
         priority: pick([0, 1, 2, 2, 3, 3, 3, 4] as const),
         stateIdentifier,
-        assigneeIdentifier: maybe(0.2) ? null : pick(userIdentifiers),
         creatorIdentifier: pick(userIdentifiers),
         projectIdentifier,
         milestoneIdentifier:
@@ -288,6 +289,13 @@ export const seedSampleData = async (
       throw new Error(`Failed to insert seed issue "${title}".`);
     }
     insertedIssueIdentifiers.push(issue.identifier);
+
+    if (assigneeIdentifier) {
+      await database.insert(issueAssignees).values({
+        issueIdentifier: issue.identifier,
+        userIdentifier: assigneeIdentifier,
+      });
+    }
 
     const labelCount = Math.floor(random() * 3);
     const chosenLabels = new Set<string>();

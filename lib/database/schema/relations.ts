@@ -5,6 +5,7 @@ import {
   comments,
   discordWebhooks,
   issueActivities,
+  issueAssignees,
   issueLabels,
   issueRelations,
   issueReminders,
@@ -57,7 +58,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.workspaceIdentifier],
     references: [workspaces.identifier],
   }),
-  assignedIssues: many(issues, { relationName: "assignee" }),
+  issueAssignments: many(issueAssignees),
   createdIssues: many(issues, { relationName: "creator" }),
 }));
 
@@ -141,11 +142,6 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     fields: [issues.stateIdentifier],
     references: [workflowStates.identifier],
   }),
-  assignee: one(users, {
-    fields: [issues.assigneeIdentifier],
-    references: [users.id],
-    relationName: "assignee",
-  }),
   creator: one(users, {
     fields: [issues.creatorIdentifier],
     references: [users.id],
@@ -165,6 +161,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     relationName: "issueParent",
   }),
   children: many(issues, { relationName: "issueParent" }),
+  issueAssignees: many(issueAssignees),
   issueLabels: many(issueLabels),
   comments: many(comments),
   activities: many(issueActivities),
@@ -172,6 +169,17 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
   reminders: many(issueReminders),
   outgoingRelations: many(issueRelations, { relationName: "relationSource" }),
   incomingRelations: many(issueRelations, { relationName: "relationTarget" }),
+}));
+
+export const issueAssigneesRelations = relations(issueAssignees, ({ one }) => ({
+  issue: one(issues, {
+    fields: [issueAssignees.issueIdentifier],
+    references: [issues.identifier],
+  }),
+  user: one(users, {
+    fields: [issueAssignees.userIdentifier],
+    references: [users.id],
+  }),
 }));
 
 export const issueLabelsRelations = relations(issueLabels, ({ one }) => ({
