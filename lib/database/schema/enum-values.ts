@@ -43,6 +43,7 @@ export const activityTypes = [
   "state_changed",
   "priority_changed",
   "assignee_changed",
+  "reporter_changed",
   "label_added",
   "label_removed",
   "project_changed",
@@ -68,4 +69,3 @@ export type NotificationType = (typeof notificationTypes)[number];
 export const priorities = [0, 1, 2, 3, 4] as const;
 
 export type Priority = (typeof priorities)[number];
-

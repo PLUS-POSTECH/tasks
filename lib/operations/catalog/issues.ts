@@ -10,6 +10,7 @@ import {
   setIssueLabels,
   setIssuePriority,
   setIssueProject,
+  setIssueReporter,
   setIssueState,
   updateIssueDescription,
   updateIssueTitle,
@@ -98,6 +99,9 @@ export const issueOperations = [
       description: z.string().max(50_000).optional().describe("Markdown"),
       priority: prioritySchema.optional(),
       assigneeIdentifier: identifier.optional(),
+      reporterIdentifier: identifier
+        .optional()
+        .describe("Active workspace member UUID; defaults to the actor. Only admins may select another member"),
       projectIdentifier: identifier.optional(),
       parentReference: reference.optional().describe("Make this a sub-issue of that issue"),
       labelIdentifiers: z.array(identifier).optional(),
@@ -111,6 +115,7 @@ export const issueOperations = [
         description: input.description ?? null,
         priority: input.priority ?? 0,
         assigneeIdentifier: input.assigneeIdentifier ?? null,
+        reporterIdentifier: input.reporterIdentifier,
         projectIdentifier: input.projectIdentifier ?? null,
         parentIdentifier: parent?.identifier ?? null,
         labelIdentifiers: input.labelIdentifiers ?? [],
@@ -130,12 +135,14 @@ export const issueOperations = [
       stateIdentifier: identifier.optional().describe("A workflow state, as listed by the workspace states operation"),
       priority: prioritySchema.optional(),
       assigneeIdentifier: identifier.nullable().optional().describe("null unassigns"),
+      reporterIdentifier: identifier.optional().describe("An active workspace member UUID; only admins can change it"),
       projectIdentifier: identifier.nullable().optional().describe("null removes from the project"),
       labelIdentifiers: z.array(identifier).optional().describe("Replaces the label set"),
       dueDate: calendarDate.nullable().optional(),
     }),
     run: async (input) => {
       const issue = await requireIssue(input.reference);
+      if (input.reporterIdentifier !== undefined) await setIssueReporter(issue.identifier, input.reporterIdentifier);
       if (input.title !== undefined) await updateIssueTitle(issue.identifier, input.title);
       if (input.description !== undefined) await updateIssueDescription(issue.identifier, input.description);
       if (input.stateIdentifier !== undefined) await setIssueState(issue.identifier, input.stateIdentifier);

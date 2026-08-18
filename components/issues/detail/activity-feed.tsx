@@ -92,6 +92,13 @@ export const ActivityFeed = async ({ issueIdentifier, activities, comments, rela
         ) : (
           <>removed the assignee</>
         );
+      case "reporter_changed":
+        return (
+          <>
+            changed reporter from {strong(nameOfMember(members, payload.fromReporterIdentifier, payload.fromReporterName))} to{" "}
+            {strong(nameOfMember(members, payload.toReporterIdentifier, payload.toReporterName))}
+          </>
+        );
       case "label_added":
         return <>added label {strong(labelName(payload.labelIdentifier, payload.labelName))}</>;
       case "label_removed":

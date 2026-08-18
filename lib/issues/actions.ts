@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, min, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, min, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, type Database } from "@/lib/database/client";
@@ -66,6 +66,7 @@ const createIssueSchema = z.object({
   stateIdentifier: nullableIdentifierSchema.default(null),
   priority: prioritySchema.default(0),
   assigneeIdentifier: nullableIdentifierSchema.default(null),
+  reporterIdentifier: identifierSchema.optional(),
   labelIdentifiers: z.array(identifierSchema).default([]),
   projectIdentifier: nullableIdentifierSchema.default(null),
   parentIdentifier: nullableIdentifierSchema.default(null),
@@ -133,6 +134,25 @@ const nameOfAssignee = async (
   return assignee ? nameOfMemberRow(assignee) : null;
 };
 
+const requireActiveReporter = async (
+  database: Database,
+  workspaceIdentifier: string,
+  reporterIdentifier: string,
+): Promise<{ readonly name: string }> => {
+  const reporter = await database.query.users.findFirst({
+    where: and(
+      eq(users.id, reporterIdentifier),
+      eq(users.workspaceIdentifier, workspaceIdentifier),
+      isNull(users.leftGuildAt),
+    ),
+    columns: memberNameColumns,
+  });
+  if (!reporter) {
+    throw new NotFoundError("Reporter not found.");
+  }
+  return reporter;
+};
+
 export const createIssue = action(async (actor, rawInput: CreateIssueInput): Promise<CreatedIssue> => {
   const input = createIssueSchema.parse(rawInput);
   await assertProjectAccessible(input.projectIdentifier);
@@ -140,6 +160,11 @@ export const createIssue = action(async (actor, rawInput: CreateIssueInput): Pro
     await assertIssueAccessible(input.parentIdentifier);
   }
   const [database, workspace] = await Promise.all([getDatabase(), getWorkspace()]);
+  const reporterIdentifier = input.reporterIdentifier ?? actor.identifier;
+  if (reporterIdentifier !== actor.identifier && !actor.isAdmin) {
+    throw new ForbiddenError("Only admins can select another issue reporter.");
+  }
+  await requireActiveReporter(database, workspace.identifier, reporterIdentifier);
 
   const created = await database.transaction(async (transaction) => {
     const [counter] = await transaction
@@ -184,7 +209,7 @@ export const createIssue = action(async (actor, rawInput: CreateIssueInput): Pro
         stateIdentifier,
         priority: input.priority,
         assigneeIdentifier: input.assigneeIdentifier,
-        creatorIdentifier: actor.identifier,
+        creatorIdentifier: reporterIdentifier,
         projectIdentifier: input.projectIdentifier,
         parentIdentifier: input.parentIdentifier,
         estimate: input.estimate,
@@ -204,7 +229,7 @@ export const createIssue = action(async (actor, rawInput: CreateIssueInput): Pro
       );
     }
     await recordActivity(transaction, issue.identifier, actor.identifier, { type: "created" });
-    await ensureSubscribed(transaction, issue.identifier, actor.identifier);
+    await ensureSubscribed(transaction, issue.identifier, reporterIdentifier);
     await notifyAssignee(transaction, issue.identifier, actor.identifier, input.assigneeIdentifier);
     return { identifier: issue.identifier, reference: formatIssueReference(counter.issueCounter) };
   });
@@ -298,6 +323,32 @@ export const setIssueAssignee = action(async (_actor, issueIdentifier: string, a
     },
   );
   await notifyAssignee(database, issue.identifier, currentUser.identifier, parsedAssignee);
+  revalidateEverything();
+});
+
+export const setIssueReporter = action(async (actor, issueIdentifier: string, reporterIdentifier: string): Promise<void> => {
+  const parsedReporter = identifierSchema.parse(reporterIdentifier);
+  const mutation = await openIssue(issueIdentifier);
+  const { database, issue } = mutation;
+  if (issue.creatorIdentifier === parsedReporter) {
+    return;
+  }
+  if (!actor.isAdmin) {
+    throw new ForbiddenError("Only admins can change issue reporters.");
+  }
+  const reporter = await requireActiveReporter(database, issue.workspaceIdentifier, parsedReporter);
+  await changeIssue(
+    mutation,
+    { creatorIdentifier: parsedReporter },
+    {
+      type: "reporter_changed",
+      fromReporterIdentifier: issue.creatorIdentifier,
+      fromReporterName: issue.creator ? nameOfMemberRow(issue.creator) : null,
+      toReporterIdentifier: parsedReporter,
+      toReporterName: nameOfMemberRow(reporter),
+    },
+  );
+  await ensureSubscribed(database, issue.identifier, parsedReporter);
   revalidateEverything();
 });
 

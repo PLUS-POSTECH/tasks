@@ -76,6 +76,8 @@ Everything a client can do is defined once as an **operation** (`lib/operations/
 - **HTTP**: `GET /api/operations` lists operations with input schemas; `POST /api/operations/<name>` with a JSON body runs one and returns `{ result }` (or `{ error, details }` with 400/401/403/404).
 - **MCP**: `POST <app URL>/api/mcp` speaks the Model Context Protocol over Streamable HTTP (stateless, JSON responses, no sessions). `tools/list` is the catalog and `tools/call` runs an operation as the token's owner. Tool names replace the dot, so `issues.create` is called as `issues_create`, and operation failures come back as tool content with `isError` rather than protocol errors.
 
+`issues_create` accepts an optional `reporterIdentifier`, using one of the active member UUIDs returned by `workspace_members`. It defaults to the token owner; only an admin may select another member. `issues_update` accepts the same field, but changing an existing reporter is always admin-only. A selected reporter is stored as the issue creator and automatically subscribed, while the token owner remains the actor shown in the activity feed.
+
 Point a client at it with the same bearer token:
 
 ```bash
