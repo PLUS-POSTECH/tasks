@@ -5,7 +5,7 @@ import { getDatabase } from "@/lib/database/client";
 import { seedDevelopmentDatabase } from "@/lib/database/development";
 import { issues } from "@/lib/database/schema";
 import { ForbiddenError } from "@/lib/errors";
-import { createIssue, deleteIssue, setIssueLabels } from "@/lib/issues/actions";
+import { createIssue, deleteIssue, setIssueLabels, setIssueReporter } from "@/lib/issues/actions";
 import { getIssueDetail } from "@/lib/issues/detail-queries";
 import { findIssueByReference } from "@/lib/issues/queries";
 import { createLabel, deleteLabel } from "@/lib/labels/actions";
@@ -51,6 +51,27 @@ describe("who may destroy what", () => {
     const moderated = await actingAs(author!.identifier, () => createIssue({ title: "Issue an admin removes" }));
     await deleteIssue(moderated.identifier);
     expect(await findIssueByReference(moderated.reference)).toBeNull();
+  });
+
+  signedInTest("moves deletion ownership to the new reporter", async () => {
+    const [originalReporter, nextReporter] = await ordinaryMembers();
+    expect(originalReporter).toBeDefined();
+    expect(nextReporter).toBeDefined();
+    if (!originalReporter || !nextReporter) {
+      throw new Error("Reporter fixtures missing.");
+    }
+
+    const issue = await createIssue({
+      title: "Issue whose reporter changes",
+      reporterIdentifier: originalReporter.identifier,
+    });
+    await setIssueReporter(issue.identifier, nextReporter.identifier);
+
+    await actingAs(originalReporter.identifier, async () => {
+      await expect(deleteIssue(issue.identifier)).rejects.toThrow(ForbiddenError);
+    });
+    await actingAs(nextReporter.identifier, () => deleteIssue(issue.identifier));
+    expect(await findIssueByReference(issue.reference)).toBeNull();
   });
 
   /**
