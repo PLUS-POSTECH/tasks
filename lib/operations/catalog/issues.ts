@@ -6,6 +6,7 @@ import {
   addComment,
   createIssue,
   setIssueAssignee,
+  setIssueAssignees,
   setIssueDueDate,
   setIssueLabels,
   setIssuePriority,
@@ -98,7 +99,13 @@ export const issueOperations = [
       title: z.string().min(1).max(500),
       description: z.string().max(50_000).optional().describe("Markdown"),
       priority: prioritySchema.optional(),
-      assigneeIdentifier: identifier.optional(),
+      assigneeIdentifiers: z
+        .array(identifier)
+        .optional()
+        .describe("Active member UUIDs to assign; takes precedence over assigneeIdentifier"),
+      assigneeIdentifier: identifier
+        .optional()
+        .describe("Compatibility input for assigning one active member"),
       reporterIdentifier: identifier
         .optional()
         .describe("Active workspace member UUID; defaults to the actor. Only admins may select another member"),
@@ -114,7 +121,8 @@ export const issueOperations = [
         title: input.title,
         description: input.description ?? null,
         priority: input.priority ?? 0,
-        assigneeIdentifier: input.assigneeIdentifier ?? null,
+        assigneeIdentifiers: input.assigneeIdentifiers,
+        assigneeIdentifier: input.assigneeIdentifier,
         reporterIdentifier: input.reporterIdentifier,
         projectIdentifier: input.projectIdentifier ?? null,
         parentIdentifier: parent?.identifier ?? null,
@@ -134,7 +142,14 @@ export const issueOperations = [
       description: z.string().max(50_000).optional(),
       stateIdentifier: identifier.optional().describe("A workflow state, as listed by the workspace states operation"),
       priority: prioritySchema.optional(),
-      assigneeIdentifier: identifier.nullable().optional().describe("null unassigns"),
+      assigneeIdentifiers: z
+        .array(identifier)
+        .optional()
+        .describe("Replaces the assignee set; an empty array unassigns everyone and takes precedence over assigneeIdentifier"),
+      assigneeIdentifier: identifier
+        .nullable()
+        .optional()
+        .describe("Compatibility input for assigning one member; null unassigns everyone"),
       reporterIdentifier: identifier.optional().describe("An active workspace member UUID; only admins can change it"),
       projectIdentifier: identifier.nullable().optional().describe("null removes from the project"),
       labelIdentifiers: z.array(identifier).optional().describe("Replaces the label set"),
@@ -147,7 +162,11 @@ export const issueOperations = [
       if (input.description !== undefined) await updateIssueDescription(issue.identifier, input.description);
       if (input.stateIdentifier !== undefined) await setIssueState(issue.identifier, input.stateIdentifier);
       if (input.priority !== undefined) await setIssuePriority(issue.identifier, input.priority);
-      if (input.assigneeIdentifier !== undefined) await setIssueAssignee(issue.identifier, input.assigneeIdentifier);
+      if (input.assigneeIdentifiers !== undefined) {
+        await setIssueAssignees(issue.identifier, input.assigneeIdentifiers);
+      } else if (input.assigneeIdentifier !== undefined) {
+        await setIssueAssignee(issue.identifier, input.assigneeIdentifier);
+      }
       if (input.projectIdentifier !== undefined) await setIssueProject(issue.identifier, input.projectIdentifier);
       if (input.labelIdentifiers !== undefined) await setIssueLabels(issue.identifier, input.labelIdentifiers);
       if (input.dueDate !== undefined) await setIssueDueDate(issue.identifier, input.dueDate);

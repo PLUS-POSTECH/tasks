@@ -38,12 +38,24 @@ describe("operations catalog", () => {
     expect(workspace.actor.identifier).toBe(me.identifier);
 
     const created = (await runOperation("issues.create", { title: "Via operations", priority: 2 })) as { reference: string };
-    const updated = (await runOperation("issues.update", { reference: created.reference, assigneeIdentifier: me.identifier, dueDate: "2030-01-02" })) as {
+    const updated = (await runOperation("issues.update", { reference: created.reference, assigneeIdentifiers: [me.identifier], dueDate: "2030-01-02" })) as {
+      assignees: readonly { identifier: string }[];
       assignee: { identifier: string } | null;
       dueDate: string | null;
     };
+    expect(updated.assignees.map((assignee) => assignee.identifier)).toEqual([me.identifier]);
     expect(updated.assignee?.identifier).toBe(me.identifier);
     expect(updated.dueDate).toBe("2030-01-02");
+    const cleared = (await runOperation("issues.update", {
+      reference: created.reference,
+      assigneeIdentifiers: [],
+    })) as { assignees: readonly unknown[] };
+    expect(cleared.assignees).toEqual([]);
+    const compatible = (await runOperation("issues.update", {
+      reference: created.reference,
+      assigneeIdentifier: me.identifier,
+    })) as { assignees: readonly { identifier: string }[] };
+    expect(compatible.assignees.map((assignee) => assignee.identifier)).toEqual([me.identifier]);
     const detail = (await runOperation("issues.get", { reference: created.reference })) as { issue: { title: string } };
     expect(detail.issue.title).toBe("Via operations");
 

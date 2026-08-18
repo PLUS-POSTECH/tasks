@@ -67,10 +67,16 @@ describe("MCP endpoint", () => {
     expect(create?.inputSchema).toMatchObject({
       type: "object",
       required: ["title"],
-      properties: { reporterIdentifier: { type: "string", format: "uuid" } },
+      properties: {
+        assigneeIdentifiers: { type: "array", items: { type: "string", format: "uuid" } },
+        reporterIdentifier: { type: "string", format: "uuid" },
+      },
     });
     expect(tools.find((tool) => tool.name === toolNameOf("issues.update"))?.inputSchema).toMatchObject({
-      properties: { reporterIdentifier: { type: "string", format: "uuid" } },
+      properties: {
+        assigneeIdentifiers: { type: "array", items: { type: "string", format: "uuid" } },
+        reporterIdentifier: { type: "string", format: "uuid" },
+      },
     });
     expect(create?.annotations.readOnlyHint).toBe(false);
     expect(tools.find((tool) => tool.name === "issues_list")?.annotations.readOnlyHint).toBe(true);
@@ -93,6 +99,7 @@ describe("MCP endpoint", () => {
     const created = await callTool("issues_create", {
       title: "Filed over MCP",
       priority: 1,
+      assigneeIdentifiers: [actor.identifier, reporter.identifier],
       reporterIdentifier: reporter.identifier,
     });
     expect(created.isError).toBeUndefined();
@@ -102,17 +109,26 @@ describe("MCP endpoint", () => {
 
     const fetched = await callTool("issues_get", { reference });
     expect(JSON.parse(fetched.content[0]?.text ?? "{}")).toMatchObject({
-      issue: { title: "Filed over MCP", creator: { identifier: reporter.identifier } },
+      issue: {
+        title: "Filed over MCP",
+        assignees: expect.arrayContaining([
+          expect.objectContaining({ identifier: actor.identifier }),
+          expect.objectContaining({ identifier: reporter.identifier }),
+        ]),
+        creator: { identifier: reporter.identifier },
+      },
       activities: [{ type: "created", actor: { identifier: actor.identifier } }],
       subscribers: [{ identifier: reporter.identifier }],
     });
 
     const updated = await callTool("issues_update", {
       reference,
+      assigneeIdentifiers: [nextReporter.identifier],
       reporterIdentifier: nextReporter.identifier,
     });
     expect(updated.isError).toBeUndefined();
     expect(JSON.parse(updated.content[0]?.text ?? "{}")).toMatchObject({
+      assignees: [expect.objectContaining({ identifier: nextReporter.identifier })],
       creator: { identifier: nextReporter.identifier },
     });
 
@@ -120,6 +136,14 @@ describe("MCP endpoint", () => {
     const refetchedDetail = JSON.parse(refetched.content[0]?.text ?? "{}");
     expect(refetchedDetail.activities).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          type: "assignee_removed",
+          payload: expect.objectContaining({ assigneeIdentifier: actor.identifier }),
+        }),
+        expect.objectContaining({
+          type: "assignee_added",
+          payload: expect.objectContaining({ assigneeIdentifier: nextReporter.identifier }),
+        }),
         {
           type: "reporter_changed",
           actor: expect.objectContaining({ identifier: actor.identifier }),
